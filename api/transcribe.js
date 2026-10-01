@@ -15,9 +15,9 @@ export default async function handler(req, res) {
     });
   }
 
-  if (!process.env.OPENAI_API_KEY) {
+  if (!process.env.GROQ_API_KEY) {
     return res.status(500).json({
-      error: "Transcription service is not configured."
+      error: "Groq API key is not configured."
     });
   }
 
@@ -25,6 +25,8 @@ export default async function handler(req, res) {
     maxFileSize: 25 * 1024 * 1024,
     keepExtensions: true
   });
+
+  let file;
 
   try {
     const [, files] = await new Promise((resolve, reject) => {
@@ -34,7 +36,7 @@ export default async function handler(req, res) {
       });
     });
 
-    const file = Array.isArray(files.file)
+    file = Array.isArray(files.file)
       ? files.file[0]
       : files.file;
 
@@ -45,22 +47,29 @@ export default async function handler(req, res) {
     }
 
     const client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
+      apiKey: process.env.GROQ_API_KEY,
+      baseURL: "https://api.groq.com/openai/v1"
     });
 
-    const result =
-      await client.audio.transcriptions.create({
-        file: fs.createReadStream(file.filepath),
-        model: "whisper-1"
-      });
+    const result = await client.audio.transcriptions.create({
+      file: fs.createReadStream(file.filepath),
+      model: "whisper-large-v3-turbo"
+    });
 
     return res.status(200).json({
       text: result.text
     });
 
   } catch (error) {
+    console.error("Groq transcription error:", error);
+
     return res.status(500).json({
       error: error.message || "Transcription failed."
     });
+
+  } finally {
+    if (file?.filepath) {
+      fs.promises.unlink(file.filepath).catch(() => {});
+    }
   }
 }
