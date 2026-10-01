@@ -1,20 +1,490 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101827"><title>Abhi Audio Transcriber</title>
-<style>
-:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;color:#172033;background:#f4f6fa}*{box-sizing:border-box}body{margin:0;padding:28px 14px}.shell{max-width:780px;margin:auto}.brand{display:flex;align-items:center;gap:12px;margin:0 0 20px}.logo{width:46px;height:46px;border-radius:14px;background:#18263d;color:#fff;display:grid;place-items:center;font-size:22px}.brand strong{display:block;font-size:17px}.brand small{color:#748096}.panel{background:white;border:1px solid #e3e8f0;border-radius:22px;padding:clamp(20px,5vw,36px);box-shadow:0 18px 55px #14213a0b}h1{font-size:clamp(27px,5vw,36px);letter-spacing:-1px;margin:0 0 8px}.sub{color:#68758b;line-height:1.6;margin:0 0 25px}.drop{border:2px dashed #bdc9da;border-radius:17px;background:#fafbfe;padding:36px 16px;text-align:center;transition:.2s}.drop.active{border-color:#3468df;background:#f1f5ff}.mic{font-size:35px;margin-bottom:8px}.muted{font-size:13px;color:#7a869b;margin:8px 0 18px}button,.pick{border:0;border-radius:11px;padding:12px 17px;background:#315fe8;color:white;font-weight:650;cursor:pointer;font-size:14px}button:disabled{opacity:.45;cursor:not-allowed}.pick{display:inline-block}input{display:none}.fileline{font-size:13px;color:#536078;margin:13px 0;overflow-wrap:anywhere}.status{font-size:13px;color:#65728a;min-height:20px;margin:12px 0}.progress{height:7px;background:#edf0f6;border-radius:10px;overflow:hidden;margin:10px 0 16px}.progress span{display:block;height:100%;width:0;background:#315fe8;transition:width .25s}h2{font-size:18px;margin:28px 0 10px}textarea{width:100%;min-height:270px;resize:vertical;border:1px solid #dce3ed;border-radius:13px;padding:15px;font:15px/1.65 inherit;color:#172033}textarea:focus{outline:2px solid #d7e2ff;border-color:#7698ee}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}.light{background:#edf1f8;color:#26344d}.note{font-size:12px;color:#7b879a;line-height:1.55;margin-top:24px}.hide{display:none}.foot{text-align:center;color:#9aa3b2;font-size:12px;margin:18px 0}@media(max-width:480px){body{padding:16px 10px}.drop{padding:28px 12px}}
-</style></head><body><main class="shell">
-<header class="brand"><div class="logo">A</div><div><strong>Abhi Audio Transcriber</strong><small>Your personal audio-to-text workspace</small></div></header>
-<section class="panel"><h1>Turn audio into text.</h1><p class="sub">Upload a voice note or recording. Get an editable transcript and download it as a plain text file.</p>
-<div class="drop" id="drop"><div class="mic">🎙</div><b>Choose an audio file or drop it here</b><p class="muted">WhatsApp OPUS, MP3, WAV, M4A, OGG and other supported audio formats</p><label class="pick" for="audio">Select audio</label><input id="audio" type="file" accept="audio/*,.opus,.ogg"></div>
-<div class="fileline" id="fileline"></div><button id="run" disabled>Transcribe audio</button><div class="progress hide" id="progress"><span id="fill"></span></div><div class="status" id="status" aria-live="polite"></div>
-<div id="output" class="hide"><h2>Your transcription</h2><textarea id="transcript" placeholder="Your transcript will appear here."></textarea><div class="actions"><button id="save">Download .TXT</button><button id="copy" class="light">Copy text</button><button id="reset" class="light">New transcription</button></div></div>
-<p class="note">Privacy: this app does not keep a transcript history. Audio is sent to the configured transcription provider for processing. Anyone with your public link may use it, so configure API spending limits before sharing.</p></section><div class="foot">Made for Abhi · Simple, private-by-design workflow</div></main>
-<script>
-const $=s=>document.querySelector(s);let selected=null;
-function choose(f){if(!f)return;if(!f.type.startsWith('audio/')&&!/\.(opus|ogg)$/i.test(f.name)){ $('#status').textContent='Please choose an audio file.';return}selected=f;$('#fileline').textContent=`Selected: ${f.name} · ${(f.size/1048576).toFixed(2)} MB` ;$('#run').disabled=false;$('#status').textContent='Ready when you are.';$('#output').classList.add('hide')}
-$('#audio').addEventListener('change',e=>choose(e.target.files[0]));['dragover','dragenter'].forEach(x=>$('#drop').addEventListener(x,e=>{e.preventDefault();$('#drop').classList.add('active')}));['dragleave','drop'].forEach(x=>$('#drop').addEventListener(x,e=>{e.preventDefault();$('#drop').classList.remove('active')}));$('#drop').addEventListener('drop',e=>choose(e.dataTransfer.files[0]));
-$('#run').onclick=async()=>{if(!selected)return;$('#run').disabled=true;$('#progress').classList.remove('hide');$('#fill').style.width='25%';$('#status').textContent='Uploading and transcribing. Larger files may take a few minutes.';try{let body=new FormData();body.append('file',selected);let response=await fetch('/api/transcribe',{method:'POST',body});let data=await response.json();if(!response.ok)throw Error(data.error||'Transcription failed');$('#fill').style.width='100%';$('#transcript').value=data.text||'';$('#output').classList.remove('hide');$('#status').textContent='Done. Review your text, then download it.'}catch(err){$('#status').textContent=err.message+' If this is a fresh deployment, check the API key setup.'}finally{$('#run').disabled=false;setTimeout(()=>$('#progress').classList.add('hide'),800)}};
-$('#save').onclick=()=>{let blob=new Blob([$('#transcript').value],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=(selected?.name.replace(/\.[^.]+$/,'')||'transcription')+'.txt';a.click();URL.revokeObjectURL(url)};
-$('#copy').onclick=async()=>{await navigator.clipboard.writeText($('#transcript').value);$('#status').textContent='Transcript copied.'};
-$('#reset').onclick=()=>{selected=null;$('#audio').value='';$('#fileline').textContent='';$('#transcript').value='';$('#output').classList.add('hide');$('#run').disabled=true;$('#status').textContent='Ready for another file.'};
-</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f4f6fa">
+  <title>Abhi Audio Transcriber</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px 16px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+        BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #172033;
+      background: #f4f6fa;
+    }
+
+    .shell {
+      width: 100%;
+      max-width: 760px;
+      margin: 0 auto;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .logo {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      border-radius: 13px;
+      background: #e8edff;
+      font-size: 23px;
+    }
+
+    .brand strong {
+      display: block;
+      font-size: 19px;
+    }
+
+    .brand small {
+      display: block;
+      margin-top: 3px;
+      color: #68738a;
+    }
+
+    .panel {
+      padding: 28px;
+      border: 1px solid #e6e9f0;
+      border-radius: 18px;
+      background: #fff;
+      box-shadow: 0 8px 30px rgba(20, 35, 70, 0.05);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 25px;
+    }
+
+    .sub {
+      margin: 0 0 22px;
+      color: #68738a;
+      line-height: 1.6;
+    }
+
+    .drop {
+      padding: 34px 20px;
+      border: 2px dashed #cbd3e4;
+      border-radius: 14px;
+      text-align: center;
+      background: #fafbfe;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .drop:hover,
+    .drop.dragover {
+      border-color: #526ee8;
+      background: #f2f5ff;
+    }
+
+    .mic {
+      margin-bottom: 12px;
+      font-size: 36px;
+    }
+
+    .drop b {
+      display: block;
+      margin-bottom: 7px;
+    }
+
+    .muted {
+      color: #7b8498;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    #audio {
+      display: none;
+    }
+
+    .fileline {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #f2f4f8;
+      color: #46516a;
+      font-size: 14px;
+      overflow-wrap: anywhere;
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 18px;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .primary {
+      width: 100%;
+      margin-top: 18px;
+      color: white;
+      background: #526ee8;
+    }
+
+    .primary:hover:not(:disabled) {
+      background: #405bd1;
+    }
+
+    .progress {
+      margin-top: 20px;
+    }
+
+    .progress.hide,
+    .output.hide,
+    .fileline.hide {
+      display: none;
+    }
+
+    .track {
+      height: 8px;
+      margin-top: 10px;
+      border-radius: 20px;
+      background: #e9edf5;
+      overflow: hidden;
+    }
+
+    #fill {
+      width: 0;
+      height: 100%;
+      border-radius: 20px;
+      background: #526ee8;
+      transition: width 0.2s;
+    }
+
+    #status {
+      color: #536078;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .output {
+      margin-top: 26px;
+      padding-top: 24px;
+      border-top: 1px solid #e9edf3;
+    }
+
+    .output h2 {
+      margin: 0 0 12px;
+      font-size: 19px;
+    }
+
+    textarea {
+      display: block;
+      width: 100%;
+      min-height: 260px;
+      padding: 14px;
+      border: 1px solid #dce2ed;
+      border-radius: 12px;
+      resize: vertical;
+      font: inherit;
+      font-size: 14px;
+      line-height: 1.7;
+      color: #172033;
+    }
+
+    textarea:focus {
+      outline: 2px solid #cbd5ff;
+      border-color: #526ee8;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .secondary {
+      color: #34405a;
+      background: #edf0f6;
+    }
+
+    .secondary:hover {
+      background: #e1e6f0;
+    }
+
+    .note {
+      margin-top: 22px;
+      color: #7b8498;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 520px) {
+      body {
+        padding: 16px 12px;
+      }
+
+      .panel {
+        padding: 20px;
+      }
+
+      h1 {
+        font-size: 22px;
+      }
+
+      .drop {
+        padding: 28px 14px;
+      }
+
+      .actions button {
+        flex: 1;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="shell">
+
+    <header class="brand">
+      <div class="logo">🎙️</div>
+      <div>
+        <strong>Abhi Audio Transcriber</strong>
+        <small>Your personal audio-to-text tool</small>
+      </div>
+    </header>
+
+    <section class="panel">
+      <h1>Turn audio into text</h1>
+      <p class="sub">
+        Upload a voice note or recording and get an editable transcript.
+      </p>
+
+      <div class="drop" id="drop">
+        <div class="mic">🎧</div>
+        <b>Choose an audio file or drop it here</b>
+        <span class="muted">
+          Supports common audio formats such as MP3, WAV, M4A, and MP4.
+        </span>
+      </div>
+
+      <input
+        type="file"
+        id="audio"
+        accept="audio/*,video/mp4,.mp3,.wav,.m4a,.ogg,.webm,.mp4"
+      >
+
+      <div id="fileline" class="fileline hide"></div>
+
+      <button id="run" class="primary" disabled>
+        Transcribe audio
+      </button>
+
+      <div id="progress" class="progress hide">
+        <div id="status">Preparing...</div>
+        <div class="track">
+          <div id="fill"></div>
+        </div>
+      </div>
+
+      <section id="output" class="output hide">
+        <h2>Your transcription</h2>
+
+        <textarea
+          id="transcript"
+          placeholder="Your transcript will appear here..."
+        ></textarea>
+
+        <div class="actions">
+          <button id="copy" class="secondary">Copy text</button>
+          <button id="save" class="secondary">Download TXT</button>
+          <button id="reset" class="secondary">Start over</button>
+        </div>
+      </section>
+
+      <p class="note">
+        Privacy: This app does not keep a transcript history.
+        Audio is sent to the configured transcription provider for processing.
+      </p>
+    </section>
+  </main>
+
+  <script type="module">
+    import { upload } from "https://esm.sh/@vercel/blob/client";
+
+    const $ = (selector) => document.querySelector(selector);
+
+    let selected = null;
+
+    const audioInput = $("#audio");
+    const drop = $("#drop");
+    const runButton = $("#run");
+    const fileline = $("#fileline");
+    const progress = $("#progress");
+    const status = $("#status");
+    const fill = $("#fill");
+    const output = $("#output");
+    const transcript = $("#transcript");
+
+    function formatSize(bytes) {
+      if (bytes < 1024 * 1024) {
+        return (bytes / 1024).toFixed(1) + " KB";
+      }
+      return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+    }
+
+    function choose(file) {
+      if (!file) return;
+
+      const isAudio =
+        file.type.startsWith("audio/") ||
+        file.type.startsWith("video/") ||
+        /\.(mp3|wav|m4a|ogg|webm|mp4|mpeg|mpga)$/i.test(file.name);
+
+      if (!isAudio) {
+        alert("Please select a valid audio or video file.");
+        return;
+      }
+
+      selected = file;
+      fileline.textContent =
+        file.name + " • " + formatSize(file.size);
+      fileline.classList.remove("hide");
+      runButton.disabled = false;
+      output.classList.add("hide");
+      progress.classList.add("hide");
+    }
+
+    drop.addEventListener("click", () => audioInput.click());
+
+    audioInput.addEventListener("change", (event) => {
+      choose(event.target.files[0]);
+    });
+
+    ["dragenter", "dragover"].forEach((eventName) => {
+      drop.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        drop.classList.add("dragover");
+      });
+    });
+
+    ["dragleave", "drop"].forEach((eventName) => {
+      drop.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        drop.classList.remove("dragover");
+      });
+    });
+
+    drop.addEventListener("drop", (event) => {
+      choose(event.dataTransfer.files[0]);
+    });
+
+    runButton.addEventListener("click", async () => {
+      if (!selected) return;
+
+      runButton.disabled = true;
+      progress.classList.remove("hide");
+      fill.style.width = "0%";
+      status.textContent = "Uploading audio...";
+
+      try {
+        const blob = await upload(selected.name, selected, {
+          access: "private",
+          handleUploadUrl: "/api/upload",
+
+          onUploadProgress: (event) => {
+            const percentage = Math.round(event.percentage * 0.75);
+            fill.style.width = percentage + "%";
+          }
+        });
+
+        status.textContent = "Upload complete. Transcribing...";
+        fill.style.width = "80%";
+
+        const response = await fetch("/api/transcribe", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            url: blob.url,
+            filename: selected.name
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Transcription failed.");
+        }
+
+        fill.style.width = "100%";
+        transcript.value = data.text || "";
+        output.classList.remove("hide");
+        status.textContent =
+          "Done. Review your text, then download it.";
+
+      } catch (error) {
+        console.error(error);
+        status.textContent =
+          error.message || "Something went wrong. Please try again.";
+      } finally {
+        runButton.disabled = false;
+      }
+    });
+
+    $("#copy").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(transcript.value);
+        $("#copy").textContent = "Copied!";
+        setTimeout(() => {
+          $("#copy").textContent = "Copy text";
+        }, 1800);
+      } catch {
+        transcript.select();
+        document.execCommand("copy");
+        $("#copy").textContent = "Copied!";
+      }
+    });
+
+    $("#save").addEventListener("click", () => {
+      const blob = new Blob(
+        [transcript.value],
+        { type: "text/plain;charset=utf-8" }
+      );
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = "transcription.txt";
+      link.click();
+
+      URL.revokeObjectURL(url);
+    });
+
+    $("#reset").addEventListener("click", () => {
+      selected = null;
+      audioInput.value = "";
+      transcript.value = "";
+      fileline.textContent = "";
+      fileline.classList.add("hide");
+      output.classList.add("hide");
+      progress.classList.add("hide");
+      runButton.disabled = true;
+      fill.style.width = "0%";
+    });
+  </script>
+</body>
+</html>
