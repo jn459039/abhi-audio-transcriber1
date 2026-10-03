@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#f4f6fa">
-  <title>Abhi Audio Transcriber</title>
+  <title>Abhi Audio Transcriber & Call Auditor</title>
 
   <style>
     * {
@@ -22,7 +22,7 @@
 
     .shell {
       width: 100%;
-      max-width: 760px;
+      max-width: 820px;
       margin: 0 auto;
     }
 
@@ -73,6 +73,13 @@
       line-height: 1.6;
     }
 
+    .section-label {
+      display: block;
+      margin: 20px 0 10px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
     .drop {
       padding: 34px 20px;
       border: 2px dashed #cbd3e4;
@@ -117,6 +124,39 @@
       color: #46516a;
       font-size: 14px;
       overflow-wrap: anywhere;
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 24px 0;
+      color: #8992a5;
+      font-size: 13px;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: #e6e9f0;
+    }
+
+    input[type="url"] {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      border: 1px solid #dce2ed;
+      border-radius: 10px;
+      font: inherit;
+      font-size: 14px;
+      color: #172033;
+    }
+
+    input[type="url"]:focus {
+      outline: 2px solid #cbd5ff;
+      border-color: #526ee8;
     }
 
     button {
@@ -188,10 +228,54 @@
       font-size: 19px;
     }
 
+    .audit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .audit-card {
+      padding: 16px;
+      border: 1px solid #e6e9f0;
+      border-radius: 12px;
+      background: #fafbfe;
+    }
+
+    .audit-card.full {
+      grid-column: 1 / -1;
+    }
+
+    .audit-card h3 {
+      margin: 0 0 8px;
+      color: #68738a;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .audit-card p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .outcome {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 20px;
+      background: #e8edff;
+      color: #405bd1;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
     textarea {
       display: block;
       width: 100%;
-      min-height: 260px;
+      min-height: 280px;
       padding: 14px;
       border: 1px solid #dce2ed;
       border-radius: 12px;
@@ -250,6 +334,14 @@
       .actions button {
         flex: 1;
       }
+
+      .audit-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .audit-card.full {
+        grid-column: auto;
+      }
     }
   </style>
 </head>
@@ -261,21 +353,26 @@
       <div class="logo">🎙️</div>
       <div>
         <strong>Abhi Audio Transcriber</strong>
-        <small>Your personal audio-to-text tool</small>
+        <small>Audio transcription & airline call auditing</small>
       </div>
     </header>
 
     <section class="panel">
-      <h1>Turn audio into text</h1>
+
+      <h1>Audio Transcription & Call Audit</h1>
+
       <p class="sub">
-        Upload a voice note or recording and get an editable transcript.
+        Upload an audio recording or paste a direct audio link.
+        Get a complete transcript and an automatic airline call audit report.
       </p>
+
+      <label class="section-label">Option 1: Upload Audio</label>
 
       <div class="drop" id="drop">
         <div class="mic">🎧</div>
         <b>Choose an audio file or drop it here</b>
         <span class="muted">
-          Supports common audio formats such as MP3, WAV, M4A, and MP4.
+          Supports MP3, WAV, M4A, MP4, OGG and WEBM.
         </span>
       </div>
 
@@ -287,8 +384,24 @@
 
       <div id="fileline" class="fileline hide"></div>
 
+      <div class="divider">OR</div>
+
+      <label class="section-label" for="audioUrl">
+        Option 2: Paste Direct Audio Link
+      </label>
+
+      <input
+        type="url"
+        id="audioUrl"
+        placeholder="https://example.com/recording.mp3"
+      >
+
+      <p class="muted">
+        Use a direct link to an audio file, not a webpage or a login-protected link.
+      </p>
+
       <button id="run" class="primary" disabled>
-        Transcribe audio
+        Generate Call Audit & Transcript
       </button>
 
       <div id="progress" class="progress hide">
@@ -299,24 +412,88 @@
       </div>
 
       <section id="output" class="output hide">
-        <h2>Your transcription</h2>
+
+        <h2>Call Audit Report</h2>
+
+        <div class="audit-grid">
+
+          <div class="audit-card">
+            <h3>Airline</h3>
+            <p id="airline"></p>
+          </div>
+
+          <div class="audit-card">
+            <h3>Call Outcome</h3>
+            <p><span id="callOutcome" class="outcome"></span></p>
+          </div>
+
+          <div class="audit-card full">
+            <h3>Customer Intent</h3>
+            <p id="customerIntent"></p>
+          </div>
+
+          <div class="audit-card full">
+            <h3>Call Summary</h3>
+            <p id="callSummary"></p>
+          </div>
+
+          <div class="audit-card full">
+            <h3>Agent's Response</h3>
+            <p id="agentResponse"></p>
+          </div>
+
+          <div class="audit-card full">
+            <h3>Resolution</h3>
+            <p id="resolution"></p>
+          </div>
+
+          <div class="audit-card full">
+            <h3>Pending Action</h3>
+            <p id="pendingAction"></p>
+          </div>
+
+        </div>
+
+        <div class="actions">
+          <button id="copyAudit" class="secondary">
+            Copy Audit Report
+          </button>
+
+          <button id="saveAudit" class="secondary">
+            Download Audit
+          </button>
+        </div>
+
+        <hr style="border:0;border-top:1px solid #e9edf3;margin:24px 0;">
+
+        <h2>Full Transcript</h2>
 
         <textarea
           id="transcript"
-          placeholder="Your transcript will appear here..."
+          placeholder="Your full transcript will appear here..."
         ></textarea>
 
         <div class="actions">
-          <button id="copy" class="secondary">Copy text</button>
-          <button id="save" class="secondary">Download TXT</button>
-          <button id="reset" class="secondary">Start over</button>
+          <button id="copyTranscript" class="secondary">
+            Copy Transcript
+          </button>
+
+          <button id="saveTranscript" class="secondary">
+            Download Transcript
+          </button>
+
+          <button id="reset" class="secondary">
+            Start Over
+          </button>
         </div>
+
       </section>
 
       <p class="note">
         Privacy: This app does not keep a transcript history.
-        Audio is sent to the configured transcription provider for processing.
+        Audio is sent to the configured processing provider.
       </p>
+
     </section>
   </main>
 
@@ -326,8 +503,10 @@
     const $ = (selector) => document.querySelector(selector);
 
     let selected = null;
+    let auditText = "";
 
     const audioInput = $("#audio");
+    const audioUrl = $("#audioUrl");
     const drop = $("#drop");
     const runButton = $("#run");
     const fileline = $("#fileline");
@@ -341,7 +520,13 @@
       if (bytes < 1024 * 1024) {
         return (bytes / 1024).toFixed(1) + " KB";
       }
+
       return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+    }
+
+    function updateButton() {
+      runButton.disabled =
+        !selected && !audioUrl.value.trim();
     }
 
     function choose(file) {
@@ -358,18 +543,32 @@
       }
 
       selected = file;
+      audioUrl.value = "";
+
       fileline.textContent =
         file.name + " • " + formatSize(file.size);
+
       fileline.classList.remove("hide");
-      runButton.disabled = false;
       output.classList.add("hide");
       progress.classList.add("hide");
+
+      updateButton();
     }
 
     drop.addEventListener("click", () => audioInput.click());
 
     audioInput.addEventListener("change", (event) => {
       choose(event.target.files[0]);
+    });
+
+    audioUrl.addEventListener("input", () => {
+      if (audioUrl.value.trim()) {
+        selected = null;
+        audioInput.value = "";
+        fileline.classList.add("hide");
+      }
+
+      updateButton();
     });
 
     ["dragenter", "dragover"].forEach((eventName) => {
@@ -390,77 +589,191 @@
       choose(event.dataTransfer.files[0]);
     });
 
+    function displayAudit(audit) {
+      $("#airline").textContent =
+        audit.airline || "Not specified";
+
+      $("#customerIntent").textContent =
+        audit.customer_intent || "Not specified";
+
+      $("#callSummary").textContent =
+        audit.call_summary || "Not specified";
+
+      $("#agentResponse").textContent =
+        audit.agent_response || "Not specified";
+
+      $("#resolution").textContent =
+        audit.resolution || "Not specified";
+
+      $("#pendingAction").textContent =
+        audit.pending_action || "Not specified";
+
+      $("#callOutcome").textContent =
+        audit.call_outcome || "Unable to Determine";
+
+      auditText = [
+        "AIRLINE CALL AUDIT REPORT",
+        "=========================",
+        "",
+        "Airline: " + (audit.airline || "Not specified"),
+        "",
+        "Customer Intent:",
+        audit.customer_intent || "Not specified",
+        "",
+        "Call Summary:",
+        audit.call_summary || "Not specified",
+        "",
+        "Agent's Response:",
+        audit.agent_response || "Not specified",
+        "",
+        "Resolution:",
+        audit.resolution || "Not specified",
+        "",
+        "Pending Action:",
+        audit.pending_action || "Not specified",
+        "",
+        "Call Outcome:",
+        audit.call_outcome || "Unable to Determine"
+      ].join("\n");
+    }
+
     runButton.addEventListener("click", async () => {
-      if (!selected) return;
+      const directUrl = audioUrl.value.trim();
+
+      if (!selected && !directUrl) return;
 
       runButton.disabled = true;
       progress.classList.remove("hide");
+      output.classList.add("hide");
       fill.style.width = "0%";
-      status.textContent = "Uploading audio...";
 
       try {
-        const blob = await upload(selected.name, selected, {
-          access: "private",
-          handleUploadUrl: "/api/upload",
+        let response;
 
-          onUploadProgress: (event) => {
-            const percentage = Math.round(event.percentage * 0.75);
-            fill.style.width = percentage + "%";
+        if (selected) {
+          // Upload file
+          status.textContent = "Uploading audio...";
+
+          const blob = await upload(selected.name, selected, {
+            access: "private",
+            handleUploadUrl: "/api/upload",
+
+            onUploadProgress: (event) => {
+              const percentage =
+                Math.round(event.percentage * 0.65);
+
+              fill.style.width = percentage + "%";
+            }
+          });
+
+          status.textContent =
+            "Upload complete. Transcribing and auditing...";
+
+          fill.style.width = "70%";
+
+          response = await fetch("/api/transcribe", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              url: blob.url,
+              filename: selected.name
+            })
+          });
+
+        } else {
+          // Process direct audio link
+          let parsedUrl;
+
+          try {
+            parsedUrl = new URL(directUrl);
+          } catch {
+            throw new Error("Please enter a valid audio URL.");
           }
-        });
 
-        status.textContent = "Upload complete. Transcribing...";
-        fill.style.width = "80%";
+          if (parsedUrl.protocol !== "https:") {
+            throw new Error(
+              "Please use a secure HTTPS audio link."
+            );
+          }
 
-        const response = await fetch("/api/transcribe", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            url: blob.url,
-            filename: selected.name
-          })
-        });
+          status.textContent =
+            "Fetching audio from link...";
+
+          fill.style.width = "15%";
+
+          response = await fetch("/api/transcribe-link", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              url: directUrl
+            })
+          });
+        }
+
+        status.textContent =
+          "Generating transcript and call audit...";
+
+        fill.style.width = "85%";
 
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data.error || "Transcription failed.");
+          throw new Error(
+            data.error || "Audio processing failed."
+          );
         }
 
+        if (!data.text) {
+          throw new Error("No transcript was returned.");
+        }
+
+        transcript.value = data.text;
+
+        displayAudit(data.audit || {});
+
         fill.style.width = "100%";
-        transcript.value = data.text || "";
         output.classList.remove("hide");
+
         status.textContent =
-          "Done. Review your text, then download it.";
+          "Completed. Audit report and full transcript are ready.";
+
+        output.scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
 
       } catch (error) {
         console.error(error);
+
         status.textContent =
           error.message || "Something went wrong. Please try again.";
+
       } finally {
         runButton.disabled = false;
       }
     });
 
-    $("#copy").addEventListener("click", async () => {
+    async function copyText(text, button, originalLabel) {
       try {
-        await navigator.clipboard.writeText(transcript.value);
-        $("#copy").textContent = "Copied!";
-        setTimeout(() => {
-          $("#copy").textContent = "Copy text";
-        }, 1800);
-      } catch {
-        transcript.select();
-        document.execCommand("copy");
-        $("#copy").textContent = "Copied!";
-      }
-    });
+        await navigator.clipboard.writeText(text);
+        button.textContent = "Copied!";
 
-    $("#save").addEventListener("click", () => {
+        setTimeout(() => {
+          button.textContent = originalLabel;
+        }, 1800);
+
+      } catch {
+        alert("Unable to copy. Please select and copy the text manually.");
+      }
+    }
+
+    function downloadText(text, filename) {
       const blob = new Blob(
-        [transcript.value],
+        [text],
         { type: "text/plain;charset=utf-8" }
       );
 
@@ -468,22 +781,61 @@
       const link = document.createElement("a");
 
       link.href = url;
-      link.download = "transcription.txt";
+      link.download = filename;
       link.click();
 
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    $("#copyAudit").addEventListener("click", () => {
+      copyText(
+        auditText,
+        $("#copyAudit"),
+        "Copy Audit Report"
+      );
+    });
+
+    $("#saveAudit").addEventListener("click", () => {
+      downloadText(auditText, "call-audit-report.txt");
+    });
+
+    $("#copyTranscript").addEventListener("click", () => {
+      copyText(
+        transcript.value,
+        $("#copyTranscript"),
+        "Copy Transcript"
+      );
+    });
+
+    $("#saveTranscript").addEventListener("click", () => {
+      downloadText(
+        transcript.value,
+        "full-transcript.txt"
+      );
     });
 
     $("#reset").addEventListener("click", () => {
       selected = null;
+      auditText = "";
+
       audioInput.value = "";
+      audioUrl.value = "";
       transcript.value = "";
+
       fileline.textContent = "";
       fileline.classList.add("hide");
+
       output.classList.add("hide");
       progress.classList.add("hide");
-      runButton.disabled = true;
+
       fill.style.width = "0%";
+
+      updateButton();
+
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      });
     });
   </script>
 </body>
