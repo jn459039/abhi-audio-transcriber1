@@ -3,10 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo Build complete"
+  },
   "dependencies": {
-    "@vercel/blob": "^2.6.1",
-    "formidable": "^3.5.2",
-    "openai": "^4.80.0",
-    "ffmpeg-static": "^5.2.0"
+    "@vercel/blob": "^2.0.0",
+    "openai": "^5.0.0"
+  },
+  "devDependencies": {
+    "vercel": "^41.0.0"
   }
 }
