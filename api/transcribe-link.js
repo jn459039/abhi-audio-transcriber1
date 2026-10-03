@@ -1,4 +1,53 @@
 import OpenAI, { toFile } from "openai";
+import ffmpegPath from "ffmpeg-static";
+import { spawn } from "child_process";
+import fs from "fs/promises";
+import os from "os";
+import path from "path";
+
+const MAX_CHUNK_SIZE = 20 * 1024 * 1024;
+const CHUNK_DURATION = 300;
+
+function runFFmpeg(args) {
+  return new Promise((resolve, reject) => {
+    const process = spawn(ffmpegPath, args);
+
+    let stderr = "";
+
+    process.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    process.on("error", reject);
+
+    process.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(
+          new Error("FFmpeg failed: " + stderr.slice(-2000))
+        );
+      }
+    });
+  });
+}
+
+async function transcribeFile(client, filePath, filename) {
+  const buffer = await fs.readFile(filePath);
+
+  const audioFile = await toFile(
+    buffer,
+    filename,
+    { type: "audio/mpeg" }
+  );
+
+  const result = await client.audio.transcriptions.create({
+    file: audioFile,
+    model: "whisper-large-v3-turbo"
+  });
+
+  return result.text || "";
+}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -12,6 +61,8 @@ export default async function handler(req, res) {
       error: "Groq API key is not configured."
     });
   }
+
+  let tempDir;
 
   try {
     const { url } = req.body || {};
@@ -38,7 +89,27 @@ export default async function handler(req, res) {
       });
     }
 
-    // Download audio from direct URL
+    if (!ffmpegPath) {
+      throw new Error("FFmpeg is not installed.");
+    }
+
+    const client = new OpenAI({
+      apiKey: process.env.GROQ_API_KEY,
+      baseURL: "https://api.groq.com/openai/v1"
+    });
+
+    tempDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), "audio-audit-")
+    );
+
+    const inputPath = path.join(tempDir, "original-audio");
+
+    const outputPattern = path.join(
+      tempDir,
+      "chunk-%03d.mp3"
+    );
+
+    // Download audio
     const audioResponse = await fetch(url, {
       signal: AbortSignal.timeout(120000)
     });
@@ -63,61 +134,74 @@ export default async function handler(req, res) {
       });
     }
 
-    const audioBuffer = await audioResponse.arrayBuffer();
+    const audioBuffer = Buffer.from(
+      await audioResponse.arrayBuffer()
+    );
 
-    if (audioBuffer.byteLength === 0) {
+    if (audioBuffer.length === 0) {
       return res.status(400).json({
         error: "The audio file is empty."
       });
     }
 
-    // Groq Whisper file limit
-    if (audioBuffer.byteLength > 25 * 1024 * 1024) {
-      return res.status(413).json({
-        error: "Audio exceeds the 25 MB limit. Please use a smaller file."
-      });
+    await fs.writeFile(inputPath, audioBuffer);
+
+    // Split and compress audio into 5-minute MP3 chunks
+    await runFFmpeg([
+      "-y",
+      "-i", inputPath,
+      "-vn",
+      "-ac", "1",
+      "-ar", "16000",
+      "-b:a", "48k",
+      "-f", "segment",
+      "-segment_time", String(CHUNK_DURATION),
+      "-reset_timestamps", "1",
+      outputPattern
+    ]);
+
+    const files = (await fs.readdir(tempDir))
+      .filter((name) => /^chunk-\d+\.mp3$/.test(name))
+      .sort();
+
+    if (files.length === 0) {
+      throw new Error("No audio chunks were generated.");
     }
 
-    const pathname = parsedUrl.pathname;
+    const transcripts = [];
 
-    let filename =
-      pathname.split("/").pop() || "audio.mp3";
+    // Transcribe each chunk
+    for (let i = 0; i < files.length; i++) {
+      const chunkPath = path.join(tempDir, files[i]);
 
-    if (
-      !/\.(mp3|wav|m4a|ogg|webm|mp4|mpeg|mpga)$/i.test(filename)
-    ) {
-      filename = "audio.mp3";
-    }
+      const stats = await fs.stat(chunkPath);
 
-    const audioFile = await toFile(
-      audioBuffer,
-      filename,
-      {
-        type: contentType || "audio/mpeg"
+      if (stats.size > MAX_CHUNK_SIZE) {
+        throw new Error(
+          `Audio chunk ${i + 1} exceeds the safe size limit.`
+        );
       }
-    );
 
-    const client = new OpenAI({
-      apiKey: process.env.GROQ_API_KEY,
-      baseURL: "https://api.groq.com/openai/v1"
-    });
+      const text = await transcribeFile(
+        client,
+        chunkPath,
+        files[i]
+      );
 
-    // Step 1: Full transcription
-    const transcription =
-      await client.audio.transcriptions.create({
-        file: audioFile,
-        model: "whisper-large-v3-turbo"
-      });
+      if (text.trim()) {
+        transcripts.push(text.trim());
+      }
+    }
 
-    const transcript = transcription.text;
+    const transcript = transcripts.join("\n\n");
 
-    if (!transcript || !transcript.trim()) {
+    if (!transcript.trim()) {
       return res.status(422).json({
         error: "No speech could be detected."
       });
     }
 
-    // Step 2: Generate airline call audit
+    // Generate call audit
     const auditResponse =
       await client.chat.completions.create({
         model: "openai/gpt-oss-120b",
@@ -194,7 +278,9 @@ ${transcript}
 
     return res.status(200).json({
       success: true,
-      filename,
+      filename:
+        parsedUrl.pathname.split("/").pop() || "audio.mp3",
+      chunks_processed: files.length,
       text: transcript,
       audit
     });
@@ -205,5 +291,13 @@ ${transcript}
     return res.status(500).json({
       error: error.message || "Audio processing failed."
     });
+
+  } finally {
+    if (tempDir) {
+      await fs.rm(tempDir, {
+        recursive: true,
+        force: true
+      }).catch(console.error);
+    }
   }
 }
