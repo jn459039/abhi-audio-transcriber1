@@ -38,7 +38,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // Fetch audio directly from the supplied URL
+    // Download audio from direct URL
     const audioResponse = await fetch(url, {
       signal: AbortSignal.timeout(120000)
     });
@@ -79,9 +79,13 @@ export default async function handler(req, res) {
     }
 
     const pathname = parsedUrl.pathname;
-    let filename = pathname.split("/").pop() || "audio.mp3";
 
-    if (!/\.(mp3|wav|m4a|ogg|webm|mp4|mpeg|mpga)$/i.test(filename)) {
+    let filename =
+      pathname.split("/").pop() || "audio.mp3";
+
+    if (
+      !/\.(mp3|wav|m4a|ogg|webm|mp4|mpeg|mpga)$/i.test(filename)
+    ) {
       filename = "audio.mp3";
     }
 
@@ -113,10 +117,10 @@ export default async function handler(req, res) {
       });
     }
 
-    // Step 2: Call audit
+    // Step 2: Generate airline call audit
     const auditResponse =
       await client.chat.completions.create({
-        model: "llama-3.3-70b-versatile",
+        model: "openai/gpt-oss-120b",
         temperature: 0.2,
         response_format: {
           type: "json_object"
