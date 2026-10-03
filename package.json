@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@vercel/blob": "^2.0.0",
+    "ffmpeg-static": "^5.2.0",
     "openai": "^5.0.0"
   },
   "devDependencies": {
